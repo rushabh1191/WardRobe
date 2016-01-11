@@ -1,6 +1,7 @@
 package com.crowdfire.wardrobe;
 
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.Cursor;
@@ -8,11 +9,11 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.support.design.widget.FloatingActionButton;
+import android.support.v4.app.Fragment;
 import android.support.v4.view.ViewPager;
-import android.support.v7.app.AppCompatActivity;
-import android.view.Menu;
-import android.view.MenuItem;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -25,14 +26,15 @@ import com.nostra13.universalimageloader.utils.StorageUtils;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Random;
 
 import butterknife.Bind;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
 
 
-public class MainActivity extends AppCompatActivity implements ViewPager.OnPageChangeListener, ImageChooserDialog.ImageURICapturedListener, OnAlertDialogButtonClickListener {
+public class ShowClothsFragment extends Fragment implements OnAlertDialogButtonClickListener
+        ,ImageChooserDialog.ImageURICapturedListener,ViewPager.OnPageChangeListener {
+
 
     @Bind(R.id.vp_pant_swiper)
     ViewPager pantSwiper;
@@ -50,6 +52,15 @@ public class MainActivity extends AppCompatActivity implements ViewPager.OnPageC
     @Bind(R.id.fab_pant)
     FloatingActionButton fabPant;
 
+    @Bind(R.id.iv_shuffle)
+    ImageView ivShuffle;
+
+    public static int SHOW_ALL_CLOTH=1;
+    public static int SHOW_FAV_CLOTH=2;
+    public static int SHOW_HISTORY_CLOTH=3;
+
+    public int type=SHOW_ALL_CLOTH;
+
     ArrayList<Integer> pants;
     ArrayList<Integer> shirts;
     DatabaseManager databaseManager;
@@ -64,34 +75,61 @@ public class MainActivity extends AppCompatActivity implements ViewPager.OnPageC
     ClothsAdapter pantSwiperAdapter;
     ClothsAdapter shirtSwiperAdapter;
 
+
+    public ShowClothsFragment() {
+        // Required empty public constructor
+    }
+
+
+
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.content_main);
 
-        ButterKnife.bind(this);
+    }
 
-        databaseManager = DatabaseManager.getDatabaseInstance(this);
+    @OnClick(R.id.iv_shuffle)
+    void shuffleChoices() {
+        if (pants.size() > 0 & shirts.size() > 0) {
+            int randomPant = MainActivity.randInt(0, pants.size() - 1);
+            int randomShirt = MainActivity.randInt(0, shirts.size() - 1);
+            pantSwiper.setCurrentItem(randomPant);
+            shirtSwiper.setCurrentItem(randomShirt);
+        } else {
+            Toast.makeText(getActivity(), "Not enough data to shuffle", Toast.LENGTH_LONG).show();
+        }
 
 
-        File cacheDir = StorageUtils.getCacheDirectory(this);
+    }
+    @Override
+    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                             Bundle savedInstanceState) {
+        // Inflate the layout for this fragment
+        View view = inflater.inflate(R.layout.content_main, container, false);
 
-//        pantSwiper.addOnPageChangeListener(this);
-//        shirtSwiper.addOnPageChangeListener(this);
+        ButterKnife.bind(this,view);
 
-        ImageLoaderConfiguration config = new ImageLoaderConfiguration.Builder(this).
-                memoryCache(new LruMemoryCache(2 * 1024 * 1024)).memoryCacheSize(2 * 1024 * 1024).
-                diskCache(new UnlimitedDiscCache(cacheDir)) // default
-                .diskCacheSize(50 * 1024 * 1024)
-                .diskCacheFileCount(100).build();
-
-        ImageLoader.getInstance().init(config);
-
+        databaseManager = DatabaseManager.getDatabaseInstance(getActivity());
 
         int currentShirt = 0;
         int currentPant = 0;
-        pants = databaseManager.getAllPantIds();
-        shirts = databaseManager.getAllShirtIds();
+
+        if(type!= SHOW_ALL_CLOTH){
+            fabPant.setVisibility(View.GONE);
+            fabShirt.setVisibility(View.GONE);
+            ivFav.setVisibility(View.GONE);
+            ivShuffle.setVisibility(View.GONE);
+
+        }
+        if(type==SHOW_ALL_CLOTH) {
+            pants = databaseManager.getAllPantIds();
+            shirts = databaseManager.getAllShirtIds();
+        }
+        else {
+            ArrayList<ArrayList<Integer>> arrayLists=databaseManager.getFavCombos();
+            pants=arrayLists.get(0);
+            shirts=arrayLists.get(1);
+        }
         if (savedInstanceState != null) {
 
             pants = savedInstanceState.getIntegerArrayList(PANT_LIST);
@@ -99,17 +137,16 @@ public class MainActivity extends AppCompatActivity implements ViewPager.OnPageC
 
             currentShirt = savedInstanceState.getInt(CURRENT_SHIRT);
             currentPant = savedInstanceState.getInt(CURRENT_PANT);
-
         }
 
         pantSwiperAdapter = new
 
-                ClothsAdapter(getSupportFragmentManager(), pants
+                ClothsAdapter(getChildFragmentManager(), pants
 
         );
         shirtSwiperAdapter = new
 
-                ClothsAdapter(getSupportFragmentManager(), shirts
+                ClothsAdapter(getChildFragmentManager(), shirts
 
         );
 
@@ -117,6 +154,15 @@ public class MainActivity extends AppCompatActivity implements ViewPager.OnPageC
         pantSwiper.setAdapter(pantSwiperAdapter);
         shirtSwiper.setAdapter(shirtSwiperAdapter);
 
+        if(type==SHOW_ALL_CLOTH) {
+            pantSwiper.addOnPageChangeListener(this);
+            shirtSwiper.addOnPageChangeListener(this);
+        }
+        else {
+
+            addSyncableListeners();
+
+        }
 
         showCloths(currentShirt, currentPant);
 
@@ -124,17 +170,31 @@ public class MainActivity extends AppCompatActivity implements ViewPager.OnPageC
 
 
         if (pants.size() == 0 && shirts.size() == 0) {
-            TextView textView = new TextView(this);
+            TextView textView = new TextView(getActivity());
 
             textView.setPadding(20, 20, 20, 20);
 
             textView.setText("Let's start adding Pants and Shirts");
-            PopupWindowAlert popupWindowAlert = new PopupWindowAlert(this,
+            PopupWindowAlert popupWindowAlert = new PopupWindowAlert(getActivity(),
                     "No Cloths", textView, "Add Pant", "Add Shirt", "", this, 1);
         }
 
+        return view;
+    }
 
-       /* pantSwiper.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
+    void addSyncableListeners(){
+
+
+
+        addListner(pantSwiper,shirtSwiper);
+        addListner(shirtSwiper,pantSwiper);
+
+    }
+
+
+    void addListner(final ViewPager viewPagerAttacher,final ViewPager toBeSyncViewPager){
+
+        viewPagerAttacher.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
 
             private int mScrollState = ViewPager.SCROLL_STATE_IDLE;
 
@@ -144,7 +204,7 @@ public class MainActivity extends AppCompatActivity implements ViewPager.OnPageC
                 if (mScrollState == ViewPager.SCROLL_STATE_IDLE) {
                     return;
                 }
-                shirtSwiper.scrollTo(pantSwiper.getScrollX(), shirtSwiper.getScrollY());
+                toBeSyncViewPager.scrollTo(viewPagerAttacher.getScrollX(), toBeSyncViewPager.getScrollY());
             }
 
             @Override
@@ -157,35 +217,23 @@ public class MainActivity extends AppCompatActivity implements ViewPager.OnPageC
 
                 mScrollState = state;
                 if (state == ViewPager.SCROLL_STATE_IDLE) {
-                    shirtSwiper.setCurrentItem(pantSwiper.getCurrentItem(), false);
+                    toBeSyncViewPager.setCurrentItem(viewPagerAttacher.getCurrentItem(), false);
                 }
 
             }
-        });*/
-
-
+        });
     }
 
-    @OnClick(R.id.iv_shuffle)
-    void shuffleChoices() {
-        if (pants.size() > 0 & shirts.size() > 0) {
-            int randomPant = randInt(0, pants.size() - 1);
-            int randomShirt = randInt(0, shirts.size() - 1);
-            pantSwiper.setCurrentItem(randomPant);
-            shirtSwiper.setCurrentItem(randomShirt);
-        } else {
-            Toast.makeText(this, "Not enough data to shuffle", Toast.LENGTH_LONG).show();
-        }
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
 
-
+        outState.putInt(CURRENT_PANT, shirtSwiper.getCurrentItem());
+        outState.putInt(CURRENT_SHIRT, pantSwiper.getCurrentItem());
+        outState.putIntegerArrayList(SHIRT_LIST, shirts);
+        outState.putIntegerArrayList(PANT_LIST, pants);
     }
 
-    @OnClick({R.id.fab_shirt, R.id.fab_pant})
-    void fabClicked(View view) {
-
-        int type = view.getId() == R.id.fab_shirt ? ClothInformation.IS_SHIRT : ClothInformation.IS_PANT;
-        new ImageChooserDialog(this, this, type);
-    }
 
     private void showCloths(int currentShirt, int currentPant) {
 
@@ -198,17 +246,13 @@ public class MainActivity extends AppCompatActivity implements ViewPager.OnPageC
         showFav(currentShirt, currentPant);
     }
 
-
-    @Override
-    protected void onSaveInstanceState(Bundle outState) {
-        super.onSaveInstanceState(outState);
-
-        outState.putInt(CURRENT_PANT, shirtSwiper.getCurrentItem());
-        outState.putInt(CURRENT_SHIRT, pantSwiper.getCurrentItem());
-        outState.putIntegerArrayList(SHIRT_LIST, shirts);
-        outState.putIntegerArrayList(PANT_LIST, pants);
+    void removeFav(int currentPant, int currentShirt) {
+        databaseManager.removeFav(pants.get(currentPant), shirts.get(currentShirt));
     }
 
+    void setFav(int currentShirtPosition, int currentPantPosition) {
+        databaseManager.addFav(shirts.get(currentShirtPosition), pants.get(currentPantPosition));
+    }
     @OnClick(R.id.iv_favorite)
     void toggleFav() {
 
@@ -222,58 +266,8 @@ public class MainActivity extends AppCompatActivity implements ViewPager.OnPageC
             }
             showFav(currentShirt, currentPant);
         } else {
-            Toast.makeText(this, "Please add a shirt and a pant to make it favorite", Toast.LENGTH_LONG).show();
+            Toast.makeText(getActivity(), "Please add a shirt and a pant to make it favorite", Toast.LENGTH_LONG).show();
         }
-    }
-
-    void removeFav(int currentPant, int currentShirt) {
-        databaseManager.removeFav(pants.get(currentPant), shirts.get(currentShirt));
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        DatabaseManager.releaseDatabase();
-    }
-
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.menu_main, menu);
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        int id = item.getItemId();
-
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
-            return true;
-        }
-
-        return super.onOptionsItemSelected(item);
-    }
-
-    @Override
-    public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
-
-    }
-
-    @Override
-    public void onPageSelected(int position) {
-
-        int pantPosition = pantSwiper.getCurrentItem();
-        int shirtPosition = shirtSwiper.getCurrentItem();
-        showFav(shirtPosition, pantPosition);
-
-    }
-
-    void setFav(int currentShirtPosition, int currentPantPosition) {
-        databaseManager.addFav(shirts.get(currentShirtPosition), pants.get(currentPantPosition));
     }
 
     void showFav(int currentShirtPostion, int currentPantPosition) {
@@ -288,32 +282,11 @@ public class MainActivity extends AppCompatActivity implements ViewPager.OnPageC
         }
     }
 
-    @Override
-    public void onPageScrollStateChanged(int state) {
-
-    }
-
-    public static int randInt(int min, int max) {
-
-        // NOTE: This will (intentionally) not run as written so that folks
-        // copy-pasting have to think about how to initialize their
-        // Random instance.  Initialization of the Random instance is outside
-        // the main scope of the question, but some decent options are to have
-        // a field that is initialized once and then re-used as needed or to
-        // use ThreadLocalRandom (if using at least Java 1.7).
-        Random rand = new Random();
-
-        // nextInt is normally exclusive of the top value,
-        // so add 1 to make it inclusive
-        int randomNum = rand.nextInt((max - min) + 1) + min;
-
-        return randomNum;
-    }
 
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode == RESULT_OK) {
+        if (resultCode == getActivity().RESULT_OK) {
 
             if (requestCode == ClothInformation.IS_PANT || requestCode % 2 == 1) {
                 if (requestCode != ClothInformation.IS_PANT) {
@@ -348,11 +321,12 @@ public class MainActivity extends AppCompatActivity implements ViewPager.OnPageC
         }
     }
 
+
     String getFilePath(Uri uri) {
 
         String[] filePathColumn = {MediaStore.Images.Media.DATA};
 
-        Cursor cursor = getContentResolver().query(
+        Cursor cursor = getActivity().getContentResolver().query(
                 uri, filePathColumn, null, null, null);
         cursor.moveToFirst();
 
@@ -360,6 +334,68 @@ public class MainActivity extends AppCompatActivity implements ViewPager.OnPageC
         String filePath = cursor.getString(columnIndex);
         cursor.close();
         return filePath;
+    }
+    @Override
+    public void onAttach(Context context) {
+        super.onAttach(context);
+
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+
+        ButterKnife.unbind(this);
+        DatabaseManager.releaseDatabase();
+    }
+
+    @Override
+    public void onDetach() {
+        super.onDetach();
+
+    }
+
+    @OnClick({R.id.fab_shirt, R.id.fab_pant})
+    void fabClicked(View view) {
+
+        int type = view.getId() == R.id.fab_shirt ? ClothInformation.IS_SHIRT : ClothInformation.IS_PANT;
+        new ImageChooserDialog(this, this, type);
+    }
+
+    @Override
+    public void onButtonClick(AlertDialog dialog, View view, int buttonId, int popupId) {
+        if (buttonId == DialogInterface.BUTTON_POSITIVE) {
+            fabClicked(fabPant);
+        }
+        else {
+            fabClicked(fabShirt);
+        }
+
+        dialog.dismiss();
+    }
+
+    @Override
+    public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
+
+    }
+
+    @Override
+    public void onPageSelected(int position) {
+        int pantPosition = pantSwiper.getCurrentItem();
+        int shirtPosition = shirtSwiper.getCurrentItem();
+        showFav(shirtPosition, pantPosition);
+
+    }
+
+    @Override
+    public void onPageScrollStateChanged(int state) {
+
+    }
+
+
+    public interface OnFragmentInteractionListener {
+        // TODO: Update argument type and name
+        void onFragmentInteraction(Uri uri);
     }
 
     @Override
@@ -382,17 +418,5 @@ public class MainActivity extends AppCompatActivity implements ViewPager.OnPageC
         }
 
 
-    }
-
-    @Override
-    public void onButtonClick(AlertDialog dialog, View view, int buttonId, int popupId) {
-
-        if (buttonId == DialogInterface.BUTTON_POSITIVE) {
-            fabClicked(fabPant);
-        } else {
-            fabClicked(fabShirt);
-        }
-
-        dialog.dismiss();
     }
 }

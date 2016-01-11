@@ -20,7 +20,7 @@ import butterknife.ButterKnife;
 /**
  * A simple {@link Fragment} subclass.
  */
-public class ShowClothFragment extends Fragment {
+public class ShowSingleClothFragment extends Fragment {
 
 
     @Bind(R.id.iv_cloth_image)
@@ -31,7 +31,7 @@ public class ShowClothFragment extends Fragment {
     int clothId;
 
     String CLOTH_ID="cloth_id";
-    public ShowClothFragment() {
+    public ShowSingleClothFragment() {
         // Required empty public constructor
     }
 

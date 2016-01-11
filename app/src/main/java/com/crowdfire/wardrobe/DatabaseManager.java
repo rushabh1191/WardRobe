@@ -72,6 +72,36 @@ public class DatabaseManager extends SQLiteOpenHelper {
         return  getClothIds(ClothInformation.IS_SHIRT);
     }
 
+
+    public ArrayList<ArrayList<Integer>> getFavCombos(){
+
+        ArrayList<Integer> pantInformation=new ArrayList<>();
+        ArrayList<Integer> shirtInformation=new ArrayList<>();
+
+
+
+        String query="SELECT * FROM "+TABLE_FAV_COMBO;
+
+        Cursor cursor=mDB.rawQuery(query,null);
+        while (cursor.moveToNext()){
+            pantInformation.add(cursor.getInt(1));
+            shirtInformation.add(cursor.getInt(0));
+        }
+
+        ArrayList<ArrayList<Integer>> favCombo=new ArrayList<>();
+
+        favCombo.add(pantInformation);
+        favCombo.add(shirtInformation);
+
+        return  favCombo;
+//        return  getClothIds(ClothInformation.IS_SHIRT);
+    }
+
+
+
+    /*public ArrayList<Integer> getFavCloths(){
+
+    }*/
     public ArrayList<Integer> getClothIds(int type){
 
         Cursor cursor=mDB.query(TABLE_CLOTH,new String[]{KEY_ID+""},C_TYPE+"=?",new String[]{type+""},null,null,null);

@@ -51,6 +51,15 @@ public class ImageChooserDialog implements AdapterView.OnItemClickListener, OnAl
         showPopup(activity, imageURICapture);
     }
 
+    public ImageChooserDialog(Fragment activity, ImageURICapturedListener imageURICapture, int clothType) {
+
+        this.fragment = activity;
+        imageURICapturedListener = imageURICapture;
+        this.clothType = clothType;
+
+        showPopup(fragment.getActivity(), imageURICapture);
+    }
+
 
     private void showPopup(Context context, ImageURICapturedListener imageURICapturedListener) {
         ListView lv = new ListView(context);
@@ -106,36 +115,24 @@ public class ImageChooserDialog implements AdapterView.OnItemClickListener, OnAl
             imageURICapturedListener.uriCaptured(uri, file.getAbsolutePath(), clothType);
 
 
-            activity.startActivityForResult(intent, clothType);
+            if(activity!=null)
+                activity.startActivityForResult(intent, clothType);
+            else if(fragment != null){
+                fragment.startActivityForResult(intent,clothType);
+            }
         } else {
             Intent galleryIntent = new Intent(Intent.ACTION_PICK,
                     android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
 // Start the Intent
-            activity.startActivityForResult(galleryIntent, clothType*3);
+            if(activity!=null) {
+                activity.startActivityForResult(galleryIntent, clothType * 3);
+            }
+            else {
+                fragment.startActivityForResult(galleryIntent, clothType * 3);
+            }
         }
         popupWindowAlert.dismiss();
-/*
-//            Intent i = new Intent(context, ApartmentAddaImageGallery.class);
-            i.setType("image");
-            i.setAction(Intent.ACTION_GET_CONTENT);
 
-//            i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-//            i.putExtra(ApartmentAddaImageGallery.NUMBER_OF_IMAGES,numberOfImages);
-
-
-            if(fragment!=null) {
-                fragment.startActivityForResult(i.createChooser(i,
-                        "Select Picture"), ACTION_CHOOSE_IMAGE);
-            }
-            else if(activity!=null)
-            {
-                activity.startActivityForResult(i.createChooser(i,
-                        "Select Picture"), ACTION_CHOOSE_IMAGE);
-            }
-        }
-*/
-
-//        popupWindowAlert.dismiss();;
 
     }
 

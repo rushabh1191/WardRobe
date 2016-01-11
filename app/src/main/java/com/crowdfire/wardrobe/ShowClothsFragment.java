@@ -11,6 +11,7 @@ import android.provider.MediaStore;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.Fragment;
 import android.support.v4.view.ViewPager;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -18,14 +19,8 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.nostra13.universalimageloader.cache.disc.impl.UnlimitedDiscCache;
-import com.nostra13.universalimageloader.cache.memory.impl.LruMemoryCache;
-import com.nostra13.universalimageloader.core.ImageLoader;
-import com.nostra13.universalimageloader.core.ImageLoaderConfiguration;
-import com.nostra13.universalimageloader.utils.StorageUtils;
-
-import java.io.File;
 import java.util.ArrayList;
+import java.util.logging.Logger;
 
 import butterknife.Bind;
 import butterknife.ButterKnife;
@@ -54,6 +49,14 @@ public class ShowClothsFragment extends Fragment implements OnAlertDialogButtonC
 
     @Bind(R.id.iv_shuffle)
     ImageView ivShuffle;
+
+    @Bind(R.id.iv_save)
+    ImageView ivSave;
+
+
+    @Bind(R.id.tv_date)
+    TextView tvDate;
+
 
     public static int SHOW_ALL_CLOTH=1;
     public static int SHOW_FAV_CLOTH=2;
@@ -114,11 +117,17 @@ public class ShowClothsFragment extends Fragment implements OnAlertDialogButtonC
         int currentShirt = 0;
         int currentPant = 0;
 
+        tvDate.setVisibility(View.GONE);
         if(type!= SHOW_ALL_CLOTH){
             fabPant.setVisibility(View.GONE);
             fabShirt.setVisibility(View.GONE);
-            ivFav.setVisibility(View.GONE);
+
             ivShuffle.setVisibility(View.GONE);
+
+        }
+        if(type==SHOW_HISTORY_CLOTH){
+            tvDate.setVisibility(View.VISIBLE);
+            ivFav.setVisibility(View.GONE);
 
         }
         if(type==SHOW_ALL_CLOTH) {
@@ -126,7 +135,7 @@ public class ShowClothsFragment extends Fragment implements OnAlertDialogButtonC
             shirts = databaseManager.getAllShirtIds();
         }
         else {
-            ArrayList<ArrayList<Integer>> arrayLists=databaseManager.getFavCombos();
+            ArrayList<ArrayList<Integer>> arrayLists=databaseManager.getCombos(type);
             pants=arrayLists.get(0);
             shirts=arrayLists.get(1);
         }
@@ -170,13 +179,25 @@ public class ShowClothsFragment extends Fragment implements OnAlertDialogButtonC
 
 
         if (pants.size() == 0 && shirts.size() == 0) {
-            TextView textView = new TextView(getActivity());
+            if(type==SHOW_ALL_CLOTH) {
+                TextView textView = new TextView(getActivity());
 
-            textView.setPadding(20, 20, 20, 20);
+                textView.setPadding(20, 20, 20, 20);
 
-            textView.setText("Let's start adding Pants and Shirts");
-            PopupWindowAlert popupWindowAlert = new PopupWindowAlert(getActivity(),
-                    "No Cloths", textView, "Add Pant", "Add Shirt", "", this, 1);
+                textView.setText("Let's start adding Pants and Shirts");
+                PopupWindowAlert popupWindowAlert = new PopupWindowAlert(getActivity(),
+                        "No Cloths", textView, "Add Pant", "Add Shirt", "", this, 1);
+            }
+            else if(type==SHOW_FAV_CLOTH){
+                Toast.makeText(getActivity(),"No Fav Cloth",Toast.LENGTH_LONG).show();
+            }
+            else {
+                Toast.makeText(getActivity(),"No Saved Cloth",Toast.LENGTH_LONG).show();
+            }
+        }
+
+        if(type==SHOW_HISTORY_CLOTH){
+            getAndDisplayDate();
         }
 
         return view;
@@ -185,10 +206,40 @@ public class ShowClothsFragment extends Fragment implements OnAlertDialogButtonC
     void addSyncableListeners(){
 
 
-
         addListner(pantSwiper,shirtSwiper);
         addListner(shirtSwiper,pantSwiper);
 
+    }
+
+    @OnClick(R.id.iv_save)
+    void saveCloth(){
+
+        if(isClothAvailable()){
+            Integer currentShirtId=shirts.get(shirtSwiper.getCurrentItem());
+            Integer currentPantId=pants.get(pantSwiper.getCurrentItem());
+            long id=databaseManager.saveClothCombo(currentShirtId, currentPantId);
+
+
+
+
+            if(id!=-1){
+                Toast.makeText(getActivity(),"Saved",Toast.LENGTH_LONG).show();
+
+                if(type==SHOW_HISTORY_CLOTH) {
+
+                    shirts.add(0, currentShirtId);
+                    pants.add(0, currentPantId);
+
+
+                    pantSwiperAdapter.notifyDataSetChanged();
+                    shirtSwiperAdapter.notifyDataSetChanged();
+
+//                    shirtSwiper.setAdapter(shirtSwiperAdapter);
+//                    pantSwiper.setAdapter(pantSwiperAdapter);
+
+                }
+            }
+        }
     }
 
 
@@ -210,6 +261,14 @@ public class ShowClothsFragment extends Fragment implements OnAlertDialogButtonC
             @Override
             public void onPageSelected(int position) {
 
+                if(type==SHOW_HISTORY_CLOTH){
+                    getAndDisplayDate();
+                }
+
+                int pantPosition = pantSwiper.getCurrentItem();
+                int shirtPosition = shirtSwiper.getCurrentItem();
+                showFav(shirtPosition, pantPosition);
+
             }
 
             @Override
@@ -222,6 +281,15 @@ public class ShowClothsFragment extends Fragment implements OnAlertDialogButtonC
 
             }
         });
+    }
+
+    void getAndDisplayDate(){
+
+        int currenshirt=shirts.get(shirtSwiper.getCurrentItem());
+        int currentPant=pants.get(pantSwiper.getCurrentItem());
+
+        String date=databaseManager.getHistoryClothDate(currenshirt,currentPant);
+        showDate(date);
     }
 
     @Override
@@ -253,6 +321,11 @@ public class ShowClothsFragment extends Fragment implements OnAlertDialogButtonC
     void setFav(int currentShirtPosition, int currentPantPosition) {
         databaseManager.addFav(shirts.get(currentShirtPosition), pants.get(currentPantPosition));
     }
+
+
+    boolean isClothAvailable(){
+        return (pants.size() > 0 & shirts.size() > 0);
+    }
     @OnClick(R.id.iv_favorite)
     void toggleFav() {
 
@@ -265,6 +338,19 @@ public class ShowClothsFragment extends Fragment implements OnAlertDialogButtonC
                 removeFav(currentPant, currentShirt);
             }
             showFav(currentShirt, currentPant);
+
+            if(type==SHOW_FAV_CLOTH){
+                pants.remove(currentPant);
+                shirts.remove(currentShirt);
+                pantSwiperAdapter.notifyDataSetChanged();
+                shirtSwiperAdapter.notifyDataSetChanged();
+                pantSwiper.setAdapter(pantSwiperAdapter);
+                shirtSwiper.setAdapter(shirtSwiperAdapter);
+
+                showFav(0,0);
+            }
+
+
         } else {
             Toast.makeText(getActivity(), "Please add a shirt and a pant to make it favorite", Toast.LENGTH_LONG).show();
         }
@@ -283,6 +369,9 @@ public class ShowClothsFragment extends Fragment implements OnAlertDialogButtonC
     }
 
 
+    void showDate(String date){
+        tvDate.setText(date);
+    }
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);

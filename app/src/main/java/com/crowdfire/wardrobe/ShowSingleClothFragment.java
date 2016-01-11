@@ -30,6 +30,7 @@ public class ShowSingleClothFragment extends Fragment {
 
     int clothId;
 
+    ShowDate showDateListener;
     String CLOTH_ID="cloth_id";
     public ShowSingleClothFragment() {
         // Required empty public constructor
@@ -51,12 +52,12 @@ public class ShowSingleClothFragment extends Fragment {
             clothId=savedInstanceState.getInt(CLOTH_ID);
         }
 
-        Log.d("beta","Cloth "+clothId);
         clothInformation=databaseManager.getCloth(clothId);
         DatabaseManager.releaseDatabase();
 
         ImageLoader imageLoader=ImageLoader.getInstance();
         imageLoader.displayImage("file:/"+clothInformation.imageUrl,ivImage);
+
 
         return view;
     }

@@ -33,8 +33,6 @@ public class WardrobeActivity extends AppCompatActivity
 
         File cacheDir = StorageUtils.getCacheDirectory(this);
 
-//        pantSwiper.addOnPageChangeListener(this);
-//        shirtSwiper.addOnPageChangeListener(this);
 
         ImageLoaderConfiguration config = new ImageLoaderConfiguration.Builder(this).
                 memoryCache(new LruMemoryCache(2 * 1024 * 1024)).memoryCacheSize(2 * 1024 * 1024).
@@ -115,6 +113,12 @@ public class WardrobeActivity extends AppCompatActivity
 
         if(id==R.id.nav_fav){
             loadFragment(ShowClothsFragment.SHOW_FAV_CLOTH,false);
+        }
+        else if(id==R.id.nav_all){
+            loadFragment(ShowClothsFragment.SHOW_ALL_CLOTH,false);
+        }
+        else if(id==R.id.nav_history){
+            loadFragment(ShowClothsFragment.SHOW_HISTORY_CLOTH,false);
         }
        /* if (id == R.id.nav_camera) {
             // Handle the camera action

@@ -5,8 +5,10 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.util.Log;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 
 /**
  * Created by rushabh on 29/12/15.
@@ -27,6 +29,11 @@ public class DatabaseManager extends SQLiteOpenHelper {
     static final String TABLE_FAV_COMBO="table_fav_combo";
     static final String C_SHIRT_ID="shirt_id";
     static final String C_PANT_ID="pant_id";
+
+    static  final String TABLE_HISTORY="table_history";
+
+    static final  String C_DATE="date_saved";
+
 
     public DatabaseManager(Context context, String name, SQLiteDatabase.CursorFactory factory, int version) {
         super(context, name, factory, version);
@@ -54,10 +61,28 @@ public class DatabaseManager extends SQLiteOpenHelper {
     public void addFav(ClothInformation shirtInfo,ClothInformation pantInformation){
         addFav(shirtInfo.id, pantInformation.id);
     }
-    public void addFav(int shirtId,int pantId){
+
+    public void addHistory(int shirtId,int pantId){
+        long millis = System.currentTimeMillis();
+
         ContentValues contentValues=new ContentValues();
         contentValues.put(C_PANT_ID,pantId);
         contentValues.put(C_SHIRT_ID,shirtId);
+        contentValues.put(C_DATE,millis);
+
+        Log.d("beta","asd "+millis);
+
+        mDB.insert(TABLE_HISTORY, null, contentValues);
+    }
+
+    public void addFav(int shirtId,int pantId){
+        long millis = System.currentTimeMillis();
+
+        ContentValues contentValues=new ContentValues();
+        contentValues.put(C_PANT_ID,pantId);
+        contentValues.put(C_SHIRT_ID,shirtId);
+
+
         mDB.insert(TABLE_FAV_COMBO, null, contentValues);
     }
 
@@ -73,14 +98,22 @@ public class DatabaseManager extends SQLiteOpenHelper {
     }
 
 
-    public ArrayList<ArrayList<Integer>> getFavCombos(){
+    public ArrayList<ArrayList<Integer>> getCombos(int type){
 
         ArrayList<Integer> pantInformation=new ArrayList<>();
         ArrayList<Integer> shirtInformation=new ArrayList<>();
 
 
 
-        String query="SELECT * FROM "+TABLE_FAV_COMBO;
+        String query=null;
+        if(type==ShowClothsFragment.SHOW_FAV_CLOTH){
+            query="SELECT * FROM "+TABLE_FAV_COMBO;
+        }
+        else {
+            query=getSavedCloths();
+        }
+
+
 
         Cursor cursor=mDB.rawQuery(query,null);
         while (cursor.moveToNext()){
@@ -120,6 +153,11 @@ public class DatabaseManager extends SQLiteOpenHelper {
         mDB.execSQL(query);
     }
 
+    public String getSavedCloths(){
+
+        String query="SELECT * FROM "+TABLE_HISTORY+" ORDER BY "+C_DATE+" DESC";
+        return query;
+    }
 
 
 
@@ -144,6 +182,23 @@ public class DatabaseManager extends SQLiteOpenHelper {
         String createFavTable="CREATE TABLE "+TABLE_FAV_COMBO+"("+C_SHIRT_ID+" integer,"+C_PANT_ID
                 +" integer)";
         database.execSQL(createFavTable);
+
+        String createHistoryTable="CREATE TABLE "+TABLE_HISTORY+"("+C_SHIRT_ID+" integer,"+C_PANT_ID
+                +" integer,"+C_DATE+" text)";
+        database.execSQL(createHistoryTable);
+    }
+
+
+    public  long saveClothCombo(int shirtId,int pantId){
+        long millis = System.currentTimeMillis();
+
+        ContentValues contentValues=new ContentValues();
+        contentValues.put(C_PANT_ID,pantId);
+        contentValues.put(C_SHIRT_ID,shirtId);
+        contentValues.put(C_DATE,millis);
+
+
+        return mDB.insert(TABLE_HISTORY, null, contentValues);
     }
 
     public ClothInformation getCloth(int id){
@@ -190,5 +245,34 @@ public class DatabaseManager extends SQLiteOpenHelper {
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
 
+    }
+
+    public String getHistoryClothDate(int currenshirt, int currentPant) {
+        String query="SELECT "+C_DATE+" FROM "+TABLE_HISTORY+" WHERE "+C_SHIRT_ID+"="+currenshirt
+                +" AND "+C_PANT_ID+"="+currentPant;
+
+        Cursor c=mDB.rawQuery(query,null);
+        try {
+
+
+            while (c.moveToNext()) {
+                Long date = Long.parseLong(c.getString(0));
+
+                Calendar calendar = Calendar.getInstance();
+                calendar.setTimeInMillis(date);
+
+                int mYear = calendar.get(Calendar.YEAR);
+                int mMonth = calendar.get(Calendar.MONTH)+1;
+                int mDay = calendar.get(Calendar.DAY_OF_MONTH);
+
+                return mDay + "/" + mMonth + "/" + mYear;
+            }
+        }
+        catch (Exception e){
+            e.printStackTrace();
+
+        }
+
+        return "Could not retrieve date";
     }
 }
